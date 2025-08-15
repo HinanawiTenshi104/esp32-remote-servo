@@ -87,9 +87,11 @@
       document.getElementById("powerBtn").addEventListener("click", () => {
         // 先发送按键角度
         client.publish(topicAngleSet, targetAngle);
-        // 再发送按键动作
-        client.publish(topicPower, "1");
-        status.innerText = "已发送按键动作，目标角度: " + targetAngle + "°";
+        // 延时后再发送按键动作
+        setTimeout(() => {
+          client.publish(topicPower, "1");
+          status.innerText = "已发送按键动作，目标角度: " + targetAngle + "°";
+        }, 150);
       });
     </script>
   </body>
