@@ -79,8 +79,6 @@
       client.on("message", (topic, message) => {
         if (topic === topicAngleReport) {
           const angle = message.toString();
-          slider.value = angle;
-          angleDisplay.innerText = angle;
           status.innerText = "ESP32 当前按下角度: " + angle + "°";
         }
       });
