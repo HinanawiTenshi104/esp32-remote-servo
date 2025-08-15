@@ -2,83 +2,99 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>ESP32 远程舵机控制</title>
+    <title>ESP32 远程开机控制</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
       body {
         text-align: center;
-        font-family: Arial;
+        font-size: 18px;
+        font-family: sans-serif;
         margin-top: 50px;
       }
       button {
-        padding: 20px;
-        font-size: 22px;
+        padding: 15px 30px;
+        font-size: 20px;
         margin-top: 20px;
       }
       input[type="range"] {
         width: 80%;
         margin-top: 20px;
       }
-      #status {
-        margin-top: 20px;
-        font-size: 20px;
-        color: green;
+      #angleValue {
+        font-weight: bold;
+        margin-left: 10px;
       }
     </style>
   </head>
   <body>
-    <h2>ESP32 远程舵机控制</h2>
-    <button id="powerBtn">按一下电源键</button>
+    <h2>ESP32 舵机远程控制</h2>
 
-    <h3>按键动作角度微调</h3>
-    <input type="range" min="10" max="180" value="40" id="angleSlider" />
-    <div>当前按下角度: <span id="angleValue">40</span>°</div>
+    <div>
+      <label>按键动作角度: </label>
+      <input type="range" id="slider" min="10" max="180" value="40" />
+      <span id="angleValue">40</span>
+    </div>
 
-    <div id="status">连接中...</div>
+    <button id="pressBtn">按下电源键</button>
 
+    <!-- MQTT over WebSocket -->
+    <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
     <script>
-      // ===== 配置 HiveMQ Cloud =====
-      const mqttHost =
-        "wss://033d43af07e94d61be495f30b77c5230.s1.eu.hivemq.cloud:8884/mqtt";
-      const mqttUser = "HinanawiTenshi";
-      const mqttPassword = "HinanawiFutao104";
+      // ===== HiveMQ Cloud 设置 =====
+      const broker = "033d43af07e94d61be495f30b77c5230.s1.eu.hivemq.cloud";
+      const port = 8000; // 非 TLS WebSocket 端口，或 8884 TLS WebSocket
+      const clientId = "web_client_" + Math.floor(Math.random() * 1000);
+      const username = "HinanawiTenshi"; // HiveMQ Cloud 凭证
+      const password = "HinanawiFutao104";
 
       const topicPower = "home/esp32/power";
-      const topicAngle = "home/esp32/angle";
+      const topicAngleReport = "home/esp32/angleReport";
+      const topicAngleSet = "home/esp32/angle";
+
+      let slider = document.getElementById("slider");
+      let angleValue = document.getElementById("angleValue");
+      let pressBtn = document.getElementById("pressBtn");
+
+      // 更新滑块显示
+      slider.addEventListener("input", () => {
+        angleValue.textContent = slider.value;
+      });
+
+      // 创建 MQTT 客户端
+      const client = new Paho.MQTT.Client(broker, port, clientId);
+
+      client.onConnectionLost = (responseObject) => {
+        console.log("连接丢失:", responseObject.errorMessage);
+      };
+
+      client.onMessageArrived = (message) => {
+        if (message.destinationName === topicAngleReport) {
+          let angle = parseInt(message.payloadString);
+          slider.value = angle;
+          angleValue.textContent = angle;
+        }
+      };
 
       // 连接 MQTT
-      const client = mqtt.connect(mqttHost, {
-        username: mqttUser,
-        password: mqttPassword,
+      client.connect({
+        userName: username,
+        password: password,
+        onSuccess: () => {
+          console.log("MQTT 连接成功");
+          client.subscribe(topicAngleReport);
+        },
+        onFailure: (err) => {
+          console.log("连接失败", err);
+        },
       });
 
-      client.on("connect", () => {
-        document.getElementById("status").innerText = "已连接 MQTT";
-        console.log("MQTT 连接成功");
-      });
-
-      client.on("error", (err) => {
-        document.getElementById("status").innerText = "MQTT连接失败:" + err;
-        console.error(err);
-      });
-
-      // 按电源键
-      document.getElementById("powerBtn").addEventListener("click", () => {
-        client.publish(topicPower, "1");
-        document.getElementById("status").innerText = "已发送按键动作指令";
-      });
-
-      // 滑块调节按键角度
-      const slider = document.getElementById("angleSlider");
-      const angleDisplay = document.getElementById("angleValue");
-
-      slider.addEventListener("input", () => {
-        const angle = slider.value;
-        angleDisplay.innerText = angle;
-        client.publish(topicAngle, angle.toString());
-        document.getElementById("status").innerText =
-          "已发送按键角度:" + angle + "°";
+      // 按钮点击发送动作指令
+      pressBtn.addEventListener("click", () => {
+        let angle = slider.value;
+        // 先更新 ESP32 按键角度
+        client.send(topicAngleSet, angle);
+        // 再触发按键动作
+        client.send(topicPower, "1");
       });
     </script>
   </body>
