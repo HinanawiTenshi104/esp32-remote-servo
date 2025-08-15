@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ESP32 远程舵机控制</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      body {
+        text-align: center;
+        font-family: Arial;
+        margin-top: 50px;
+      }
+      button {
+        padding: 20px;
+        font-size: 22px;
+        margin-top: 20px;
+      }
+      input[type="range"] {
+        width: 80%;
+        margin-top: 20px;
+      }
+      #status {
+        margin-top: 20px;
+        font-size: 20px;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>ESP32 远程舵机控制</h2>
+    <button id="powerBtn">按一下电源键</button>
+
+    <h3>按键动作角度微调</h3>
+    <input type="range" min="10" max="180" value="70" id="angleSlider" />
+    <div>当前按下角度: <span id="angleValue">70</span>°</div>
+
+    <div id="status">连接中...</div>
+
+    <script>
+      // ===== 配置 HiveMQ Cloud =====
+      const mqttHost =
+        "033d43af07e94d61be495f30b77c5230.s1.eu.hivemq.cloud:8884/mqtt";
+      const mqttUser = "HinanawiTenshi";
+      const mqttPassword = "HinanawiFutao104";
+
+      const topicPower = "home/esp32/power";
+      const topicAngle = "home/esp32/angle";
+
+      // 连接 MQTT
+      const client = mqtt.connect(mqttHost, {
+        username: mqttUser,
+        password: mqttPassword,
+      });
+
+      client.on("connect", () => {
+        document.getElementById("status").innerText = "已连接 MQTT";
+        console.log("MQTT 连接成功");
+      });
+
+      client.on("error", (err) => {
+        document.getElementById("status").innerText = "MQTT连接失败:" + err;
+        console.error(err);
+      });
+
+      // 按电源键
+      document.getElementById("powerBtn").addEventListener("click", () => {
+        client.publish(topicPower, "1");
+        document.getElementById("status").innerText = "已发送按键动作指令";
+      });
+
+      // 滑块调节按键角度
+      const slider = document.getElementById("angleSlider");
+      const angleDisplay = document.getElementById("angleValue");
+
+      slider.addEventListener("input", () => {
+        const angle = slider.value;
+        angleDisplay.innerText = angle;
+        client.publish(topicAngle, angle.toString());
+        document.getElementById("status").innerText =
+          "已发送按键角度:" + angle + "°";
+      });
+    </script>
+  </body>
+</html>
